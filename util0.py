@@ -799,8 +799,50 @@ def mov_ep(recN,v,t,spike_idx,epoch_idx,fdname,stimulus,csvpath,N, Wn, plot):
     return(Apdf,Vdf,Tdf)
     
 
+def RaRi(RecVlist,fdname):
+    R = np.zeros((len(RecVlist),3))
+    for n,i in enumerate(RecVlist):
+        t,v,pho = readtraces(fdname, i)  
+        dt = t[1]-t[0]
+        baseline = np.mean(v[:int(0.005/dt)])#np.mean(v[:int(0.003/dt)])
+        Ra = 10/abs(min(v)-baseline)*1000
+        Rinpt = 10/abs(np.mean(v[int(0.019/dt):int(0.020/dt)])-baseline)*1000#10/abs(np.mean(v[int(0.007/dt):int(0.008/dt)])-baseline)*1000
+        R[n][0] = i
+        R[n][1] = Ra
+        R[n][2] = Rinpt
+    #     print('Rec%d: Ra is %f Mohm' %(i,Ra))
+    #     print('      Rinput is %f Mohm' %Rinpt)
+    Rdf = pd.DataFrame(R)
+    Rdf.columns = ['RecN','Ra','Rinput']
+    #save
+    dir_aligned = 'Analysis/%s'%fdname+'/aligned/Isteps'
+    try:
+        os.makedirs(dir_aligned)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+    Rdf.to_pickle(dir_aligned+'/RaRinput.ASCII')
+    
+    from pandas.tools.plotting import table
+    plt.figure(figsize = [10,1+0.1*len(RecVlist)])
+    ax = plt.subplot(111, frame_on=False) # no visible frame
+    ax.xaxis.set_visible(False)  # hide the x axis
+    ax.yaxis.set_visible(False)  # hide the y axis
 
-# In[ ]:
+    table(ax, Rdf,loc='center')  # where df is your data frame
+    
+    dir_pic = 'Pics/%s'%fdname+'/Isteps'
+    try:
+        os.makedirs(dir_pic)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+    
+    plt.savefig(dir_pic+'/RaRinput.jpeg')
+    plt.close()
+    return(Rdf)
+
+
 
 
 
