@@ -203,6 +203,7 @@ class RAW:
         Sq_PvN =  ['Sq_PvN_lambda30_1Hz','Sq_PvN_lambda30_1Hz_bgstill_15gap','Sq_PvN_lambda30_1Hz_bgstill_45gap']
         Sine_PvN = ['Sine_PvN_lambda30_zHz_bgstill']
         Sine_PvN_u = ['Sine_PvN_lambda30_uHz_bgstill']
+        Edge_Strips = ['Edges_light_strips', 'Edges_dark_strips']
         
         if any(stimulus in x  for x in Sq_12dir):
             sti_type = 'Sq_12dir'; sti_set = Sq_12dir; deftotal = 73;  NoBinned = [ 48.,   0.,   0.,  24.]
@@ -229,8 +230,10 @@ class RAW:
             sti_type = 'Sine_xC'; sti_set = Sine_xC; deftotal = 109; NoBinned = [72.,  0.,  0., 36.]   
         elif any(stimulus in x  for x in Sine_strips):
             sti_type = 'Sine_strips'; sti_set = Sine_strips; deftotal = 145; NoBinned = [96.,  0.,  0., 48.]  
+        elif any(stimulus in x  for x in Edge_Strips): 
+            sti_type = 'Edge_Strips'; sti_set =Edge_Strips; deftotal = 118; NoBinned = [34., 70.,  1., 12.]
         elif any(stimulus in x  for x in Edges_vel): 
-            sti_type = 'Edges_vel'; sti_set =Edges_vel; deftotal = 85; NoBinned = [78.,  0.,  0.,  6.]
+            sti_type = 'Edges_vel'; sti_set =Edges_vel; deftotal = 85; NoBinned = [78.,  0.,  0.,  6.]    
         elif any(stimulus in x  for x in Edges_vel_vert): 
             sti_type = 'Edges_vel_vert'; sti_set =Edges_vel_vert; deftotal = 85; NoBinned = [78.,  0.,  0.,  6.]
         elif any(stimulus in x  for x in Sine_patches): 
@@ -255,10 +258,10 @@ class RAW:
     def checkepoch(self,thresh_pho):
         sti_type,sti_set,deftotal,NoBinned = self.def_type()
         dt = self.t[1]-self.t[0]
-        if any(self.sti_type in x for x in ['Flash','Edges_vel','Edges_vel_vert']):
-            self.epoch_idx = np.argwhere(self.pho>thresh_pho)[1:][np.diff(np.argwhere(self.pho>thresh_pho),axis=0)>(1/10/dt)][1:-1]#[1:-1] 
-        #elif any(self.sti_type in x for x in ['Edges_vel']):
-        #    self.epoch_idx = np.argwhere(self.pho>thresh_pho)[1:][np.diff(np.argwhere(self.pho>thresh_pho),axis=0)>(1/10/dt)][:-1]
+        if any(self.sti_type in x for x in ['Flash','Edges_vel','Edges_vel_vert',]):
+            self.epoch_idx = np.argwhere(self.pho>thresh_pho)[1:][np.diff(np.argwhere(self.pho>thresh_pho),axis=0)>(1/10/dt)][:-1]#[1:-1] 
+#         elif any(self.sti_type in x for x in ['Edge_Strips']):
+#             self.epoch_idx = np.argwhere(self.pho>thresh_pho)[1:][np.diff(np.argwhere(self.pho>thresh_pho),axis=0)>(1/10/dt)]
         else:
             self.epoch_idx = np.argwhere(self.pho>thresh_pho)[1:][np.diff(np.argwhere(self.pho>thresh_pho),axis=0)>(1/2/dt)]#[:-1]#[1:]
               
@@ -380,9 +383,10 @@ class RAW:
         df = pd.read_csv(self.csvpath, usecols =['FrameNumber'])
         # if "epoch no.1" got mixed in: 
         epochNo = df.values[df.values!=1]
-        epoch_label = epochNo[:-1][np.diff(epochNo, axis = 0) !=0]    
+        epoch_label = epochNo[:-1][np.diff(epochNo, axis = 0) !=0]
+        
         #epoch_label = df.values[1:-1][np.diff(df.values, axis = 0) != 0
-        if any(sti_type in x for x in ['Edges_vel','Edges_vel_vert','Flash']): 
+        if any(sti_type in x for x in ['Edges_vel','Edges_vel_vert','Flash','Edge_Strips']): 
             epochNo =df.values; epoch_label = epochNo[:-1][np.diff(epochNo, axis = 0) !=0]
             epoch_label = epoch_label[epoch_label!=1]  
             if sti_type == 'Edges_vel': 
@@ -397,13 +401,35 @@ class RAW:
                 len_label = 21; keys = np.arange(2,9)
                 epoch_angle = [60,120,180,240,300,360,420]
                 epoch_loc = np.zeros(len(epoch_angle))
-            if len(epoch_label) != len_label:
-                print("error: No. of epoch label")
-                print(len(epoch_label))  
+            elif sti_type == 'Edge_Strips':
+                len_label = 361; keys = np.arange(2,122)
+                if np.size(epoch_label) > (len_label-1):
+                    epoch_label = epoch_label[:-1]
+                epoch_angle = np.repeat(np.asarray([12.5,50,100,200,300]),24)
+                epoch_loc = [15,16,17,18,19,10,-19,-18,-17,-16,-15,-10,25,26,27,28,29,20,-29,-28,-27,-26,-25,-20]*5
+                epoch_dur = np.repeat(np.asarray([94,24,12,6,4]),24) # unit here is 1 = 1/60 second. 
+                epoch_dur[np.arange(-1,121,6)[1:]] =  60
+                # the local edges used are 5,6,7,8,9 & interval is 0. 
+                # edge modes: 
+                    # -for H2: 1 is PDPD, -1 is NDPD, 2 is PDND, -2 is NDND
+                    # -for HS: 1 is NDND,  -1 is PDND, 2 is NDPD,  -2 is PDPD
+                # The edge mode is added befor local edge locs. e.g. "15" is PDPD edge 5. 
+            if sti_type == 'Edge_Strips':
+                if np.size(epoch_label) != (len_label-1):
+                    print("error: No. of epoch label")
+                    print(len(epoch_label))                     
+            else:     
+                if len(epoch_label) != len_label:
+                    print("error: No. of epoch label")
+                    print(len(epoch_label))  
             Dic = dict(zip(keys, epoch_angle))
             angles = [Dic[i] for i in epoch_label]
             Dic_loc =  dict(zip(keys, epoch_loc))
             locs = [Dic_loc[i] for i in epoch_label]  
+            if sti_type == 'Edge_Strips':
+                Dic_dur =  dict(zip(keys, epoch_dur))
+                durs =[Dic_dur[i] for i in epoch_label]
+                self.durs = durs
         else:
 
             if len(epoch_label) == deftotal:
@@ -422,8 +448,11 @@ class RAW:
             sDic = dict(zip(keys, epoch_loc))
             locs = [sDic[i] for i in epoch_label.reshape(RS_size)[:,0]]            
 
-        self.angles = angles; self.locs = locs  
-        return(self.angles,self.locs)        
+        self.angles = angles; self.locs = locs 
+        if sti_type == 'Edge_Strips':
+            return(self.angles,self.locs, self.durs)
+        else:   
+            return(self.angles,self.locs)        
     
     def save_eps_ACC(self): # save the epochs of 'ACC' in df.csv. 
         # translate variables
@@ -501,46 +530,75 @@ class RAW:
     def save_eps_Edges(self):
     # for "Edges_light_vel"
         # translate variables
-        tepochs = self.tepochs; spiking = self.spiking; epoch_idx = self.epoch_idx; 
+        spiking = self.spiking; epoch_idx = self.epoch_idx; 
         spike_idx = self.spike_idx; t = self.t;v = self.v; pho = self.pho; 
         stimulus= self.stimulus_name; csvpath = self.csvpath; fdname = self.fdname; 
         recN = self. recN;sti_type = self.sti_type;
         
-        start_idx = epoch_idx[:-1].reshape(int((len(epoch_idx)-1)/2),2)[:,0]
-        end_idx = np.hstack([start_idx[1:],epoch_idx[-1]])
-        angles,locs = self.findepochnames()
-        APtrain = np.zeros(len(v)); APtrain[spike_idx] = 1
-        
-        Eps = []; Aps = []; 
+        if sti_type == 'Edge_Strips':
+            angles,locs,durs = self.findepochnames()
+            onesec = epoch_idx[1]-epoch_idx[0]
+            durs = np.around(np.asarray(durs)/60*onesec)
+
+            start_idx =  np.insert(np.cumsum(durs)[:-1],0,0) + epoch_idx[1]
+            end_idx = np.cumsum(durs) + epoch_idx[1]
+            print(end_idx[-1]); print(epoch_idx[-1])   
+        else:
+            start_idx = epoch_idx[:-1].reshape(int((len(epoch_idx)-1)/2),2)[:,0]
+            end_idx = np.hstack([start_idx[1:],epoch_idx[-1]])
+            angles,locs = self.findepochnames()
+            
+        if spiking: 
+            APtrain = np.zeros(len(v)); APtrain[spike_idx] = 1; Aps = []        
+        Eps = [] 
         for i in np.arange(len(angles)):
-            ep = v[start_idx[i]:end_idx[i]]
-            ap = APtrain[start_idx[i]:end_idx[i]]    
-            Eps.append(ep); Aps.append(ap);
+            ep = v[int(start_idx[i]):int(end_idx[i])];  Eps.append(ep)
+            if spiking:
+                ap = APtrain[int(start_idx[i]):int(end_idx[i])]; Aps.append(ap);
         # pad shorter epochs with np.nan to make it uniform
-        v_epoch,pad_idx = padding(Eps); Ap_epoch,pad_idx = padding(Aps);
-        dt = t[1] - t[0]; T = dt*np.shape(Ap_epoch)[1]
+        v_epoch,pad_idx = padding(Eps); 
+        if spiking: 
+            Ap_epoch,pad_idx = padding(Aps);
+        dt = t[1] - t[0]; T = dt*np.shape(v_epoch)[1]
         if sti_type == 'Flash':
             onidx = int(2/dt)
         else:
-            onidx = int(1/dt)            
-        # get pre/bl & mov # post
-        v_pre = v_epoch[:,int(onidx/2): onidx]; v_mov = v_epoch[:,onidx:]
-        v_post = np.vstack((v_epoch[1:,:int(onidx/2)],np.zeros(int(onidx/2))));
-        
-        Ap_pre = Ap_epoch[:,int(onidx/2): onidx]; Ap_mov = Ap_epoch[:,onidx:]
-        Ap_post = np.vstack((Ap_epoch[1:,:int(onidx/2)],np.zeros(int(onidx/2))));
-        
-        for n,i in enumerate(pad_idx):
-            if i != np.shape(v_epoch)[1]:
-                pad = np.empty((np.shape(v_epoch)[0], np.shape(v_epoch)[1]-i)); pad[:] = np.nan
-                v_epoch[n,:] = np.hstack((v_pre[n,:],v_epoch[n,onidx:i],v_post[n,:],pad[n,:]))
-                Ap_epoch[n,:] = np.hstack((Ap_pre[n,:],Ap_epoch[n,onidx:i],Ap_post[n,:],pad[n,:]))
-            else:
-                v_epoch[n,:] = np.hstack((v_pre[n,:],v_epoch[n,onidx:i],v_post[n,:]))
-                Ap_epoch[n,:] = np.hstack((Ap_pre[n,:],Ap_epoch[n,onidx:i],Ap_post[n,:]))
+            onidx = int(1/dt)  
+        if sti_type == 'Edge_Strips':
+            bl =v[int((epoch_idx[0]+onesec/2)):epoch_idx[1]]
+            int_sti_idx = np.arange(-1,len(v_epoch),6)[1:]
+            v_post = v_epoch[int_sti_idx][:,:int(onesec/2)]
+            v_pre = v_epoch[int_sti_idx][:,int(onesec/2):onesec]
+            v_mov = v_epoch[np.setdiff1d(np.arange(len(v_epoch)),int_sti_idx)]
+            if spiking:
+                Ap_post = Ap_epoch[int_sti_idx][:,:int(onesec/2)]
+                Ap_pre = Ap_epoch[int_sti_idx][:,int(onesec/2):onesec]
+                Ap_mov = Ap_epoch[np.setdiff1d(np.arange(len(Ap_epoch)),int_sti_idx)]
+    
+        else:
+            # get pre/bl & mov # post
+            v_pre = v_epoch[:,int(onidx/2): onidx]; v_mov = v_epoch[:,onidx:]
+            v_post = np.vstack((v_epoch[1:,:int(onidx/2)],np.zeros(int(onidx/2))));
+            if spiking:
+                Ap_pre = Ap_epoch[:,int(onidx/2): onidx]; Ap_mov = Ap_epoch[:,onidx:]
+                Ap_post = np.vstack((Ap_epoch[1:,:int(onidx/2)],np.zeros(int(onidx/2))));
+
+            for n,i in enumerate(pad_idx):
+                if i != np.shape(v_epoch)[1]:
+                    pad = np.empty((np.shape(v_epoch)[0], np.shape(v_epoch)[1]-i)); pad[:] = np.nan
+                    v_epoch[n,:] = np.hstack((v_pre[n,:],v_epoch[n,onidx:i],v_post[n,:],pad[n,:]))
+                    if spiking:
+                        Ap_epoch[n,:] = np.hstack((Ap_pre[n,:],Ap_epoch[n,onidx:i],Ap_post[n,:],pad[n,:]))
+                else:
+                    v_epoch[n,:] = np.hstack((v_pre[n,:],v_epoch[n,onidx:i],v_post[n,:]))
+                    if spiking:
+                        Ap_epoch[n,:] = np.hstack((Ap_pre[n,:],Ap_epoch[n,onidx:i],Ap_post[n,:]))
 
         dur = (np.asarray(pad_idx) - onidx)*dt
-        return(v_epoch,v_pre,v_mov,v_post, Ap_epoch, Ap_pre,Ap_mov, Ap_post, T, dur)    
+        if spiking:
+            return(v_epoch,v_pre,v_mov,v_post, Ap_epoch, Ap_pre,Ap_mov, Ap_post, T, dur)  
+        else:
+            return(v_epoch,v_pre,v_mov,v_post,T, dur) 
     
     def save_eps(self,N, Wn,bin_size): # master of saving epochs, coordinate btw different stimuli. 
         # translate variables
@@ -553,9 +611,17 @@ class RAW:
         if any(sti_type in x for x in ['Sine_ACC', 'Sine_ACC_y']):
             ds,Vdf,Apdf = self.save_eps_ACC(); T = 6        
         else:
-            angles,locs = self.findepochnames()
-            if any(sti_type in x for x in ['Edges_vel','Edges_vel_vert', 'Flash']):
-                v_epoch,v_pre,v_mov,v_post, Ap_epoch, Ap_pre,Ap_mov, Ap_post, T, dur = self.save_eps_Edges()
+            if any(sti_type in x for x in ['Edge_Strips']):
+                angles,locs,_ = self.findepochnames()
+                int_sti_idx = np.arange(-1,len(angles),6)[1:]
+                mov_sti_idx = np.setdiff1d(np.arange(len(angles)),int_sti_idx)
+            else:
+                angles,locs = self.findepochnames()
+            if any(sti_type in x for x in ['Edges_vel','Edges_vel_vert', 'Flash','Edge_Strips']):
+                if spiking:
+                    v_epoch,v_pre,v_mov,v_post, Ap_epoch, Ap_pre,Ap_mov, Ap_post, T, dur = self.save_eps_Edges()
+                else:
+                    v_epoch,v_pre,v_mov,v_post, T, dur = self.save_eps_Edges()            
             
             else:
                 # calculating length of pre, mov & post. 
@@ -585,24 +651,38 @@ class RAW:
                 angles = angles[:sshape]; locs = locs[:sshape]; T = 4         
             
             dir_pics = 'Pics/%s/%d'%(fdname,recN); makedir(dir_pics)
-            # create dfs
-            Vdf = makedfs(angles,locs,v_epoch).sort_values(by=['Locs', 'Angles'])
-            preVdf = makedfs(angles,locs,v_pre).sort_values(by=['Locs', 'Angles'])
-            movVdf = makedfs(angles,locs,v_mov).sort_values(by=['Locs', 'Angles']) 
-            postVdf = makedfs(angles,locs,v_post).sort_values(by=['Locs', 'Angles'])
+            if any(sti_type in x for x in ['Edge_Strips']):
+                # create dfs
+                Vdf = makedfs(angles,locs,v_epoch).sort_values(by=['Locs', 'Angles'])
+                preVdf = makedfs([angles[i] for i in int_sti_idx],[locs[i] for i in int_sti_idx],v_pre).sort_values(by=['Locs', 'Angles'])
+                movVdf = makedfs([angles[i] for i in mov_sti_idx],[locs[i] for i in mov_sti_idx],v_mov).sort_values(by=['Locs', 'Angles']) 
+                postVdf = makedfs([angles[i] for i in int_sti_idx],[locs[i] for i in int_sti_idx],v_post).sort_values(by=['Locs', 'Angles'])               
+            else: 
+                # create dfs
+                Vdf = makedfs(angles,locs,v_epoch).sort_values(by=['Locs', 'Angles'])
+                preVdf = makedfs(angles,locs,v_pre).sort_values(by=['Locs', 'Angles'])
+                movVdf = makedfs(angles,locs,v_mov).sort_values(by=['Locs', 'Angles']) 
+                postVdf = makedfs(angles,locs,v_post).sort_values(by=['Locs', 'Angles'])
             Vidx = Vdf.index.values
-            if any(sti_type in x for x in ['Edges_vel', 'Edges_vel_vert', 'Flash']):
+            if any(sti_type in x for x in ['Edges_vel', 'Edges_vel_vert', 'Flash','Edge_Strips']):
                 Vmfftdf = None            
             else:    
                 Vmfftdf = fftVm(movVdf,T,fdname,recN, N, Wn,Vidx)
 
             if spiking:
-                Apdf = makedfs(angles,locs,Ap_epoch).sort_values(by=['Locs', 'Angles'])
-                preApdf = makedfs(angles,locs,Ap_pre).sort_values(by=['Locs', 'Angles'])
-                movApdf = makedfs(angles,locs,Ap_mov).sort_values(by=['Locs', 'Angles'])
-                postApdf = makedfs(angles,locs,Ap_post).sort_values(by=['Locs', 'Angles'])
+                if any(sti_type in x for x in ['Edge_Strips']):
+                    # create dfs
+                    Apdf = makedfs(angles,locs,Ap_epoch).sort_values(by=['Locs', 'Angles'])
+                    preApdf = makedfs([angles[i] for i in int_sti_idx],[locs[i] for i in int_sti_idx],Ap_pre).sort_values(by=['Locs', 'Angles'])
+                    movApdf = makedfs([angles[i] for i in mov_sti_idx],[locs[i] for i in mov_sti_idx],Ap_mov).sort_values(by=['Locs', 'Angles']) 
+                    postApdf = makedfs([angles[i] for i in int_sti_idx],[locs[i] for i in int_sti_idx],Ap_post).sort_values(by=['Locs', 'Angles']) 
+                else: 
+                    Apdf = makedfs(angles,locs,Ap_epoch).sort_values(by=['Locs', 'Angles'])
+                    preApdf = makedfs(angles,locs,Ap_pre).sort_values(by=['Locs', 'Angles'])
+                    movApdf = makedfs(angles,locs,Ap_mov).sort_values(by=['Locs', 'Angles'])
+                    postApdf = makedfs(angles,locs,Ap_post).sort_values(by=['Locs', 'Angles'])
                 Apidx = Apdf.index.values                
-                if any(sti_type in x for x in ['Edges_vel', 'Edges_vel_vert', 'Flash']):
+                if any(sti_type in x for x in ['Edges_vel', 'Edges_vel_vert', 'Flash','Edge_Strips']):
                     APfftdf = None
                 else:
                     APfftdf = fftAP(movApdf,T,fdname,recN,Apidx)
@@ -663,9 +743,9 @@ class RAW:
                 plt.plot(t,FiltV(Vdf.fillna(0).iloc[n][2:],N,Wn),'g')
                 if any(self.sti_type in x for x in ['Edges_vel','Edges_vel_vert']):
                     plt.axvline(x=0.5,linewidth=2, color='k')
-                else:
+                elif self.sti_type !='Edge_Strips' :
                     plt.axvline(x=1,linewidth=2, color='k')
-                if any(self.sti_type in x for x in ['Flash','Edges_vel','Edges_vel_vert']) !=True:
+                if any(self.sti_type in x for x in ['Flash','Edges_vel','Edges_vel_vert','Edge_Strips']) !=True:
                     plt.axvline(x=0.5,linewidth=1, ls = ':', color='k') 
                     plt.axvline(x=(T-1),linewidth=2, color='k'); plt.axvline(x=(T-0.5),linewidth=1, ls = ':', color='k')     
                     if T==6: # for ACC etc. 
@@ -705,7 +785,7 @@ class RAW:
                         plt.axvline(x=0.5/bin_size,ls = ':',linewidth=2, color='k')
                     elif self.sti_type == 'Flash':
                         plt.axvline(x=1.0/bin_size,ls = ':',linewidth=2, color='k')      
-                    else: 
+                    elif self.sti_type != 'Edge_Strips': 
                         plt.axvline(x=1.0/bin_size,linewidth=2, color='k')
                         plt.axvline(x=0.5/bin_size,linewidth=1, ls = ':', color='k') 
                         plt.axvline(x=(T-1)/bin_size,linewidth=2, color='k')
@@ -780,12 +860,16 @@ class AVG(): # stimulus_name,fdname,recN,spiking,csvroot,csvpath,
         Vdf = ds['Vdf']; preVdf = ds['preVdf']; postVdf = ds['postVdf']; movVdf = ds['movVdf']; Vmfftdf = ds['Vmfftdf']
         
         dirn = AngleGp(Vdf.values[:,:2])
+        if ds['sti_type'] == 'Edge_Strips':
+            dirnmov = AngleGp(movVdf.values[:,:2])
+            dirnpost = AngleGp(postVdf.values[:,:2])
+        
         dt = ds['t'][1]-ds['t'][0]        
        
         V = Vdf.values[:,2:]; Vpre = preVdf.values[:,2:]; Vmov = movVdf.values[:,2:]; Vpost = postVdf.values[:,2:]
         if ds['spiking']: 
             N = ds['filter']['N']; Wn = ds['filter']['Wn']
-            if any(ds['sti_type'] in x for x in ['Flash','Edges_vel','Edges_vel_vert']) != True:
+            if any(ds['sti_type'] in x for x in ['Flash','Edges_vel','Edges_vel_vert','Edge_Strips']) != True:
                 V = FiltV(V, N, Wn); Vpre = FiltV(Vpre, N, Wn); Vmov = FiltV(Vmov, N, Wn); Vpost = FiltV(Vpost, N, Wn)
             else: 
                 V = FiltV(Vdf.fillna(0).iloc[:,2:], N, Wn); Vpre = FiltV(preVdf.fillna(0).iloc[:,2:], N, Wn); 
@@ -793,7 +877,7 @@ class AVG(): # stimulus_name,fdname,recN,spiking,csvroot,csvpath,
                 V[Vdf.iloc[:,2:].isnull().values] = np.nan; Vpre[preVdf.iloc[:,2:].isnull().values] = np.nan; 
                 Vmov[movVdf.iloc[:,2:].isnull().values] = np.nan; Vpost[postVdf.iloc[:,2:].isnull().values] = np.nan    
 
-        if ds['sti_type'] == ['Edges_vel','Edges_vel_vert']:
+        if ds['sti_type'] == ['Edges_vel','Edges_vel_vert','Edge_Strips']:
             hfpre = int(np.shape(preVdf.iloc[:,2:])[1]); hfpost = int(np.shape(postVdf.iloc[:,2:])[1])
         else:
             hfpre = int(np.shape(preVdf.iloc[:,2:])[1]/2); hfpost = int(np.shape(postVdf.iloc[:,2:])[1]/2)
@@ -801,17 +885,27 @@ class AVG(): # stimulus_name,fdname,recN,spiking,csvroot,csvpath,
         Vpre = Vpre[:,hfpre:]; Vpost = Vpost[:,:hfpost] 
             
         # calculate baseline based on 0.5s before stimulus. 
-        bltime= int(0.5/dt); blpre = Vpre[:,-bltime:];         
+        if ds['sti_type'] == 'Edge_Strips':
+            blpre = Vpre; bltime = 50028
+        else:
+            bltime= int(0.5/dt); blpre = Vpre[:,-bltime:];         
         if blmode == 'indi': 
             bl = np.mean(blpre,axis=1) #bl contains baseline for individual epochs
         else: 
-            bl = np.mean(np.mean(blpre,axis=1))
-            bl = np.ones(Vpre.shape[0]) *bl
-
+            bl = np.mean(np.mean(blpre,axis=1))            
+            if ds['sti_type'] == 'Edge_Strips':
+                blmov = np.ones(Vmov.shape[0]) *bl
+            bl = np.ones(V.shape[0]) *bl
+            
         V_ms = np.vstack([V[i,:] - bl[i] for i in range(np.shape(V)[0])])
-        Vmov_ms = np.vstack([Vmov[i,:] - bl[i] for i in range(np.shape(Vmov)[0])])
-        Vpost_ms = np.vstack([Vpost[i,:bltime] - bl[i] for i in range(np.shape(Vpost)[0])])
-        Vmovsum = np.nanmean(Vmov_ms,axis = 1); Vpostsum = np.nanmean(Vpost_ms,axis = 1)
+        if ds['sti_type'] == 'Edge_Strips':
+            Vmov_ms = np.vstack([Vmov[i,:] - blmov[i] for i in range(np.shape(Vmov)[0])])
+        else:
+            Vmov_ms = np.vstack([Vmov[i,:] - bl[i] for i in range(np.shape(Vmov)[0])])
+            Vpost_ms = np.vstack([Vpost[i,:bltime] - bl[i] for i in range(np.shape(Vpost)[0])])
+            Vpostsum = np.nanmean(Vpost_ms,axis = 1)
+        Vmovsum = np.nanmean(Vmov_ms,axis = 1); 
+        
         if Vmfftdf is not None:
             Vmfft = Vmfftdf.values[:,2:]
         
@@ -827,91 +921,121 @@ class AVG(): # stimulus_name,fdname,recN,spiking,csvroot,csvpath,
             Vdccmean =  np.zeros(len(dirn)); Vdccstd =  np.zeros(len(dirn));
             
         T = ds['T']
-        Vmovmean = np.zeros(len(dirn)); Vmovstd = np.zeros(len(dirn)) 
-        Vpostmean = np.zeros(len(dirn)); Vpoststd = np.zeros(len(dirn)) 
-        blmean = np.zeros(len(dirn)); blstd = np.zeros(len(dirn))
+        if ds['sti_type'] == 'Edge_Strips':
+            Vmovmean = np.zeros(len(dirnmov)); Vmovstd = np.zeros(len(dirnmov)) 
+            blmean = np.zeros(len(dirnmov)); blstd = np.zeros(len(dirnmov))
+            ep_names_mov = movVdf.values[np.asarray(dirnmov)-1,:2]
+        else:    
+            Vmovmean = np.zeros(len(dirn)); Vmovstd = np.zeros(len(dirn)) 
+            Vpostmean = np.zeros(len(dirn)); Vpoststd = np.zeros(len(dirn)) 
+            blmean = np.zeros(len(dirn)); blstd = np.zeros(len(dirn))
         if Vmfftdf is not None:
             Vfftmean = np.zeros((len(dirn),np.shape(Vmfft)[1])); Vfftstd = np.zeros((len(dirn),np.shape(Vmfft)[1])) 
         
         ep_names = Vdf.values[np.asarray(dirn)-1,:2]
-        
+      
         if plot == True: 
             fig1, ax1 = plt.subplots()
             t = np.linspace(0,T,np.shape(V)[1])
-        for n in np.arange(0,len(dirn)):   
-            dirn_idx = dirn[n]-1
-            if n == 0: 
-                V0 = V_ms[:dirn[n],:]; 
-                Vmovmean[n] = np.mean(Vmovsum[:dirn[n]]); Vmovstd[n] = np.std(Vmovsum[:dirn[n]])
-                Vpostmean[n] = np.mean(Vpostsum[:dirn[n]]); Vpoststd[n] = np.std(Vpostsum[:dirn[n]])
-                blmean[n] = np.mean(bl[:dirn[n]]); blstd[n] = np.std(bl[:dirn[n]])
-                if Vmfftdf is not None:
-                    Vfftmean[n] = np.mean(Vmfft[:dirn[n],:], axis = 0); Vfftstd[n] = np.std(Vmfft[:dirn[n],:], axis = 0)
-                if ds['sti_type']== 'ACC':
-                    Vaccmean[n] = np.mean(Vaccsum[:dirn[n]]); Vaccstd[n] = np.std(Vaccsum[:dirn[n]]);
-                    Vdccmean[n] = np.mean(Vdccsum[:dirn[n]]); Vdccstd[n] = np.std(Vdccsum[:dirn[n]]);
-            else:
-                V0 = V_ms[dirn[n-1]:dirn[n],:]; 
-                Vmovmean[n] = np.mean(Vmovsum[dirn[n-1]:dirn[n]]); Vmovstd[n] = np.std(Vmovsum[dirn[n-1]:dirn[n]]) 
-                Vpostmean[n] = np.mean(Vpostsum[dirn[n-1]:dirn[n]]); Vpoststd[n] = np.std(Vpostsum[dirn[n-1]:dirn[n]])
-                blmean[n] = np.mean(bl[dirn[n-1]:dirn[n]]); blstd[n] = np.std(bl[dirn[n-1]:dirn[n]])
-                if Vmfftdf is not None:
-                    Vfftmean[n] = np.mean(Vmfft[dirn[n-1]:dirn[n],:],axis = 0); Vfftstd[n] = np.std(Vmfft[dirn[n-1]:dirn[n],:],axis = 0) 
-                if ds['sti_type']== 'ACC':
-                    Vaccmean[n] = np.mean(Vaccsum[dirn[n-1]:dirn[n]]); Vaccstd[n] = np.std(Vaccsum[dirn[n-1]:dirn[n]]);
-                    Vdccmean[n] = np.mean(Vdccsum[dirn[n-1]:dirn[n]]); Vdccstd[n] = np.std(Vdccsum[dirn[n-1]:dirn[n]]);
-            V0mean = np.mean(V0, axis = 0)
-            V0std = np.std(V0, axis = 0)
- 
-            if plot == True: 
-                fig, ax = plt.subplots()
-                for j in np.arange(0,np.shape(V0)[0]): 
-                    plt.plot(t,V0[j],':')
-                plt.plot(t,V0mean,'k')
-                plt.xlabel('t(s)'); plt.ylabel('v(mv)')
-                plt.axvline(x=1.0,linewidth=2, color='k')
-                plt.axvline(x=0.5,linewidth=1, ls = ':', color='k')
-                if any(ds['sti_type'] in x for x in ['Flash','Edges_vel','Edges_vel_vert']) != True:
-                    plt.axvline(x=(T-1),linewidth=2, color='k')
-                    plt.axvline(x=(T-0.5),linewidth=1, ls = ':', color='k')                    
-                    if T==6: # for ACC etc. 
-                        plt.axvline(x=2.0,linewidth=2, color='k') 
-                        plt.axvline(x=4.0,linewidth=2, color='k')          
-                plt.title((Vdf.values[dirn_idx,:2],'n=%d'%(np.shape(V0)[0]))) 
-                ax.spines['right'].set_visible(False)
-                ax.spines['top'].set_visible(False)
-                ax.xaxis.set_ticks_position('bottom')
-                ax.yaxis.set_ticks_position('left')
-                plt.xlim(right = T)
-                fig.savefig('Pics/%s/%d/fig%0.1f,%0.1f.png' %(self.fdname, self.recN, Vdf.values[dirn_idx,0],Vdf.values[dirn_idx,1]))
-                ax1.plot(t,V0mean,':')
-                plt.close()
+        if ds['sti_type'] == 'Edge_Strips':
+            for m in np.arange(0,len(dirnmov)):
+                if m == 0:              
+                    Vmovmean[m] = np.mean(Vmovsum[:dirnmov[m]]); Vmovstd[m] = np.std(Vmovsum[:dirnmov[m]])
+                    blmean[m] = np.mean(blmov[:dirnmov[m]]); blstd[m] = np.std(blmov[:dirnmov[m]])    
+                else:
+                    Vmovmean[m] = np.mean(Vmovsum[dirnmov[m-1]:dirn[m]]); Vmovstd[m] = np.std(Vmovsum[dirnmov[m-1]:dirn[m]])
+                    blmean[m] = np.mean(blmov[dirnmov[m-1]:dirnmov[m]]); blstd[m] = np.std(blmov[dirn[m-1]:dirn[m]])   
+            for n in np.arange(0,len(dirn)):   
+                dirn_idx = dirn[n]-1
+                if n == 0: 
+                    V0 = V_ms[:dirn[n],:]; 
+                else:
+                    V0 = V_ms[dirn[n-1]:dirn[n],:];                     
+                V0mean = np.mean(V0, axis = 0);  V0std = np.std(V0, axis = 0)
+                if plot == True: 
+                    fig, ax = plt.subplots()
+                    for j in np.arange(0,np.shape(V0)[0]): 
+                        plt.plot(t,V0[j],':')
+                    plt.plot(t,V0mean,'k',alpha =0.5); plt.xlabel('t(s)'); plt.ylabel('v(mv)')      
+                    plt.title((Vdf.values[dirn_idx,:2],'n=%d'%(np.shape(V0)[0]))) 
+                    ax.spines['right'].set_visible(False); ax.spines['top'].set_visible(False)
+                    ax.xaxis.set_ticks_position('bottom'); ax.yaxis.set_ticks_position('left')
+                    plt.xlim(right = T)
+                    fig.savefig('Pics/%s/%d/fig%0.1f,%0.1f.png' %(self.fdname, self.recN, Vdf.values[dirn_idx,0],Vdf.values[dirn_idx,1]))
+                    ax1.plot(t,V0mean,':'); plt.close()            
+        else:            
+            for n in np.arange(0,len(dirn)):   
+                dirn_idx = dirn[n]-1
+                if n == 0: 
+                    V0 = V_ms[:dirn[n],:]; 
+                    Vmovmean[n] = np.mean(Vmovsum[:dirn[n]]); Vmovstd[n] = np.std(Vmovsum[:dirn[n]])
+                    Vpostmean[n] = np.mean(Vpostsum[:dirn[n]]); Vpoststd[n] = np.std(Vpostsum[:dirn[n]])
+                    blmean[n] = np.mean(bl[:dirn[n]]); blstd[n] = np.std(bl[:dirn[n]])
+                    if Vmfftdf is not None:
+                        Vfftmean[n] = np.mean(Vmfft[:dirn[n],:], axis = 0); Vfftstd[n] = np.std(Vmfft[:dirn[n],:], axis = 0)
+                    if ds['sti_type']== 'ACC':
+                        Vaccmean[n] = np.mean(Vaccsum[:dirn[n]]); Vaccstd[n] = np.std(Vaccsum[:dirn[n]]);
+                        Vdccmean[n] = np.mean(Vdccsum[:dirn[n]]); Vdccstd[n] = np.std(Vdccsum[:dirn[n]]);
+                else:
+                    V0 = V_ms[dirn[n-1]:dirn[n],:]; 
+                    Vmovmean[n] = np.mean(Vmovsum[dirn[n-1]:dirn[n]]); Vmovstd[n] = np.std(Vmovsum[dirn[n-1]:dirn[n]]) 
+                    Vpostmean[n] = np.mean(Vpostsum[dirn[n-1]:dirn[n]]); Vpoststd[n] = np.std(Vpostsum[dirn[n-1]:dirn[n]])
+                    blmean[n] = np.mean(bl[dirn[n-1]:dirn[n]]); blstd[n] = np.std(bl[dirn[n-1]:dirn[n]])
+                    if Vmfftdf is not None:
+                        Vfftmean[n] = np.mean(Vmfft[dirn[n-1]:dirn[n],:],axis = 0); Vfftstd[n] = np.std(Vmfft[dirn[n-1]:dirn[n],:],axis = 0) 
+                    if ds['sti_type']== 'ACC':
+                        Vaccmean[n] = np.mean(Vaccsum[dirn[n-1]:dirn[n]]); Vaccstd[n] = np.std(Vaccsum[dirn[n-1]:dirn[n]]);
+                        Vdccmean[n] = np.mean(Vdccsum[dirn[n-1]:dirn[n]]); Vdccstd[n] = np.std(Vdccsum[dirn[n-1]:dirn[n]]);
+                V0mean = np.mean(V0, axis = 0)
+                V0std = np.std(V0, axis = 0)
+                if plot == True: 
+                    fig, ax = plt.subplots()
+                    for j in np.arange(0,np.shape(V0)[0]): 
+                        plt.plot(t,V0[j],':')
+                    plt.plot(t,V0mean,'k',alpha =0.5);plt.xlabel('t(s)'); plt.ylabel('v(mv)')
+                    plt.axvline(x=1.0,linewidth=2, color='k'); plt.axvline(x=0.5,linewidth=1, ls = ':', color='k')
+                    if any(ds['sti_type'] in x for x in ['Flash','Edges_vel','Edges_vel_vert']) != True:
+                        plt.axvline(x=(T-1),linewidth=2, color='k'); plt.axvline(x=(T-0.5),linewidth=1, ls = ':', color='k') 
+                        if T==6: # for ACC etc. 
+                            plt.axvline(x=2.0,linewidth=2, color='k'); plt.axvline(x=4.0,linewidth=2, color='k')          
+                    plt.title((Vdf.values[dirn_idx,:2],'n=%d'%(np.shape(V0)[0]))) 
+                    ax.spines['right'].set_visible(False); ax.spines['top'].set_visible(False)
+                    ax.xaxis.set_ticks_position('bottom'); ax.yaxis.set_ticks_position('left')
+                    plt.xlim(right = T)
+                    fig.savefig('Pics/%s/%d/fig%0.1f,%0.1f.png' %(self.fdname, self.recN, Vdf.values[dirn_idx,0],Vdf.values[dirn_idx,1]))
+                    ax1.plot(t,V0mean,':'); plt.close()
         if plot == True:             
             ax1.legend(ep_names,loc  = 0, prop={'size': 8})
-            ax1.spines['right'].set_visible(False)
-            ax1.spines['top'].set_visible(False)
-            ax1.xaxis.set_ticks_position('bottom')
-            ax1.yaxis.set_ticks_position('left') 
+            ax1.spines['right'].set_visible(False); ax1.spines['top'].set_visible(False)
+            ax1.xaxis.set_ticks_position('bottom'); ax1.yaxis.set_ticks_position('left') 
             fig1.savefig('Pics/%s/%d/mean' %(self.fdname, self.recN,))
         plt.close()
-        if any(ds['sti_type'] in x for x in ['Flash','Edges_vel','Edges_vel_vert']):
+        if any(ds['sti_type'] in x for x in ['Flash','Edges_vel','Edges_vel_vert','Edge_Strips']):
             Vmov0mean,Vmov0std,Vmov1mean,Vmov1std,Vmov2mean,Vmov2std = [None]*6
         else:
             Vmov0mean,Vmov0std,Vmov1mean,Vmov1std,Vmov2mean,Vmov2std = twoVMeanStd(dirn,Vmov_ms)
-        dmean = {'Vmovmean':Vmovmean ,'Vpostmean':Vpostmean,'blmean': blmean,
-                 'Vmov0mean':Vmov0mean,'Vmov1mean':Vmov1mean,'Vmov2mean':Vmov2mean} 
-        dstd = {'Vmovstd':Vmovstd,'Vpoststd':Vpoststd,'blstd': blstd,'Vmov0std':Vmov0std,'Vmov1std':Vmov1std,'Vmov2std':Vmov2std}
-        if ds['sti_type']== 'ACC':
-            dmean = {**dmean, **{'Vaccmean':Vaccmean,'Vdccmean': Vdccmean}}
-            dstd = {**dstd, **{'Vaccstd':Vaccstd,  'Vdccstd':Vdccstd}}        
-        dmeandf = pd.DataFrame.from_dict(dmean);dstddf = pd.DataFrame.from_dict(dstd) 
-        if Vmfftdf is not None:
-            Vfftmeandf = pd.DataFrame(Vfftmean, columns = Vmfftdf.columns[2:])
-            Vfftstddf = pd.DataFrame(Vfftstd, columns = Vmfftdf.columns[2:])
-        else:
+        if ds['sti_type'] == 'Edge_Strips':
+            dmean = {'Vmovmean':Vmovmean ,'blmean': blmean}
+            dstd = {'Vmovstd':Vmovstd,'blstd': blstd}  
+            dmeandf = pd.DataFrame.from_dict(dmean);dstddf = pd.DataFrame.from_dict(dstd) 
             Vfftmeandf = None; Vfftstddf = None
-        self.Vavg = {'ep_names':ep_names, 'T':T, 'blmode': blmode,'sti_type':ds['sti_type'],'dmeandf' : dmeandf, 
-                     'dstddf': dstddf,'fftmeandf': Vfftmeandf, 'fftstddf': Vfftstddf}
+            self.Vavg = {'ep_names':ep_names_mov, 'T':T, 'blmode': blmode,'sti_type':ds['sti_type'],'dmeandf' : dmeandf, 
+                         'dstddf': dstddf,'fftmeandf': Vfftmeandf, 'fftstddf': Vfftstddf}
+        else:                                      
+            dmean = {'Vmovmean':Vmovmean ,'Vpostmean':Vpostmean,'blmean': blmean,
+                     'Vmov0mean':Vmov0mean,'Vmov1mean':Vmov1mean,'Vmov2mean':Vmov2mean} 
+            dstd = {'Vmovstd':Vmovstd,'Vpoststd':Vpoststd,'blstd': blstd,'Vmov0std':Vmov0std,'Vmov1std':Vmov1std,'Vmov2std':Vmov2std}
+            if ds['sti_type']== 'ACC':
+                dmean = {**dmean, **{'Vaccmean':Vaccmean,'Vdccmean': Vdccmean}}
+                dstd = {**dstd, **{'Vaccstd':Vaccstd,  'Vdccstd':Vdccstd}}        
+            dmeandf = pd.DataFrame.from_dict(dmean);dstddf = pd.DataFrame.from_dict(dstd) 
+            if Vmfftdf is not None:
+                Vfftmeandf = pd.DataFrame(Vfftmean, columns = Vmfftdf.columns[2:])
+                Vfftstddf = pd.DataFrame(Vfftstd, columns = Vmfftdf.columns[2:])
+            else:
+                Vfftmeandf = None; Vfftstddf = None
+            self.Vavg = {'ep_names':ep_names, 'T':T, 'blmode': blmode,'sti_type':ds['sti_type'],'dmeandf' : dmeandf, 
+                         'dstddf': dstddf,'fftmeandf': Vfftmeandf, 'fftstddf': Vfftstddf}
         with open('Analysis/%s'%self.fdname+'/rec%dVavg.pkl'%self.recN,'wb') as f:
             pickle.dump(self.Vavg, f, pickle.HIGHEST_PROTOCOL)
             print('all saved!')
@@ -928,7 +1052,8 @@ class AVG(): # stimulus_name,fdname,recN,spiking,csvroot,csvpath,
             hfpre = int(np.shape(preApdf.iloc[:,2:])[1]); hfpost = int(np.shape(postApdf.iloc[:,2:])[1])
         else:
             hfpre = int(np.shape(preApdf.iloc[:,2:])[1]/2); hfpost = int(np.shape(postApdf.iloc[:,2:])[1]/2)
-        
+        if ds['sti_type'] == 'Edge_Strips':
+            hfpre  =  0; hfpost = 50028
         APtotal = np.sum(Apdf.iloc[:,2:],axis =1).astype(np.int64)
         APpre = np.sum(preApdf.iloc[:,2+hfpre:],axis =1).astype(np.int64) # 0.5s before
         APmov = np.sum(movApdf.iloc[:,2:],axis =1).astype(np.int64)
