@@ -12,6 +12,7 @@ from scipy.stats import ttest_ind_from_stats
 import scipy.signal as signal
 from scipy import stats
 import matplotlib as mpl
+from matplotlib.lines import Line2D
 
 def makedir(newdir):
     try:
@@ -532,4 +533,38 @@ def LR(celltype, csvroot, pageName):
             # simple 12 dir of normed values
         pltLR(spiking,csvroot,stimulus,i,0);  pltLR(spiking,csvroot,stimulus,i,1)
     
-    
+def pltH2HSkir(meanfile,stdfile,cellfile,tp, csvroot,celltype,stimulus):
+    if stimulus == 'Sine_PDND_lambda30_zHz':
+        savedir = csvroot+'Pics/%s/%s/' %(stimulus,celltype); makedir(savedir)
+        plt.figure(figsize=(10,6));plt.xscale('symlog',subsx = [2, 3, 4, 5, 6, 7, 8, 9])
+        csvpath = csvroot + 'Analysis/' + stimulus+'/'+ celltype
+        fdlist = ['control','HS_kir']; clist = ['g','lime']
+        for n,i in enumerate(fdlist):
+            MeanVdf = pd.read_csv(csvpath + '/%s/%s.csv' %(i,meanfile))
+            StdVdf = pd.read_csv(csvpath +  '/%s/%s.csv' %(i,stdfile))
+            cellVdf = pd.read_csv(csvpath +  '/%s/%s.csv' %(i,cellfile))
+            if tp[:2] == 'Vm':
+                Mov, Movyerr, Mov0, Mov0yerr,Mov1, Mov1yerr, Mov2, Mov2yerr = pltVval(MeanVdf,StdVdf)
+            else:
+                Mov, Movyerr, Mov0, Mov0yerr,Mov1, Mov1yerr, Mov2, Mov2yerr = pltAPval(MeanVdf,StdVdf)
+            stim_dir = MeanVdf['Angles']    
+            #pltPDNDz(stim_dir, Mov, Movyerr, Mov0, Mov0yerr, Mov1, Mov1yerr, Mov2, Mov2yerr, clist[n])
+            sti_len = len(MeanVdf['Angles'])
+            m = int(len(cellVdf['Angles'])/sti_len)
+            for j in range(m):
+                if tp[:2] == 'Vm':
+                    indi = cellVdf['Vmovmean'].values[j*30:int(30*(j+1))]
+                else:   
+                    indi = cellVdf['APmovmean'].values[j*30:int(30*(j+1))]
+                plt.plot(stim_dir,indi,clist[n],alpha=0.4)
+
+            pidxbase = np.max(Mov[15:] + abs(Mov[:15][::-1]))
+            pidx = (Mov[15:] - Mov[:15][::-1])/pidxbase 
+            cellpidx = Cellpidx (MeanVdf,cellVdf,pidxbase,tp)
+
+        legend_elements = [Line2D([0], [0], color=clist[0],label='control'),
+                          Line2D([0], [0], color=clist[1],label='HS_kir')]
+
+        plt.legend(handles=legend_elements,loc = 0) 
+        plt.title(stimulus + '_' +tp); plt.xlabel('Hz'); plt.ylabel('response')
+        plt.savefig(savedir+'HS_kir_%s.jpeg' %tp) 
