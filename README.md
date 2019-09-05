@@ -1,6 +1,6 @@
 # EphysAnalysis
 
-This is an interactive code for analyzing electrophysiological recordings acquired with Igor. From single cell to averages between cell class, there are designated Jupiter notebooks (JN) and modules for each stimulus condition. To start, there's a simple pipeline: 
+This is an interactive code for analyzing, plotting, performing statsitical tests on electrophysiological recordings acquired with Igor. From single-cell to averages between cell classes, there are designated Jupiter notebooks (JN) and modules for each stimulus condition. To start, there's a simple pipeline: 
 
 1. Check basic cell properties: run the JN "CellProp" to analyze access resistance, membrane baseline and IF curve. 
    (associate module: "util0.py" )
